@@ -385,4 +385,11 @@ impl ProgressTracker {
             }
         }
     }
+
+    /// 重置
+    pub fn reset_node(&mut self,id:u64, next_idx: u64){
+        if let Some(pr) = self.progress.get_mut(&id){
+            pr.reset(next_idx);
+        }
+    }
 }

@@ -283,20 +283,22 @@ impl<T: Storage> RaftLog<T> {
     /// # Panics
     ///
     /// Panics if the index goes past the last index.
-    pub fn commit_to(&mut self, to_commit: u64) {
+    pub fn commit_to(&mut self, to_commit: u64)->bool {
         // never decrease commit
         if self.committed >= to_commit {
-            return;
+            return false;
         }
         if self.last_index() < to_commit {
-            fatal!(
+            warn!(
                 self.unstable.logger,
                 "to_commit {} is out of range [last_index {}]",
                 to_commit,
                 self.last_index()
-            )
+            );
+            return true;
         }
         self.committed = to_commit;
+        false
     }
 
     /// Advance the applied index to the passed in value.

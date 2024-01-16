@@ -1014,6 +1014,12 @@ impl<T: Storage> Raft<T> {
         }
     }
 
+    /// 重置节点内存信息
+    pub fn reset_node(&mut self, id: u64){
+        let last_index = self.raft_log.last_index();
+        self.mut_prs().reset_node(id, last_index);
+    }
+
     /// Appends a slice of entries to the log.
     /// The entries are updated to match the current index and term.
     /// Only called by leader currently
@@ -1766,6 +1772,9 @@ impl<T: Storage> Raft<T> {
                     pr.become_probe();
                 }
                 self.send_append(m.from);
+            }else if m.request_snapshot == INVALID_INDEX{
+                // 快照id非法，则重置节点的内存状态
+                self.reset_node(m.from);
             }
             return;
         }
@@ -2513,7 +2522,13 @@ impl<T: Storage> Raft<T> {
     // TODO: revoke pub when there is a better way to test.
     /// For a message, commit and send out heartbeat.
     pub fn handle_heartbeat(&mut self, mut m: Message) {
-        self.raft_log.commit_to(m.commit);
+        if self.raft_log.commit_to(m.commit){
+            // commit out of range，通过下面的发送请求快照的消息来通知leader重置消息
+            //
+            info!(self.logger, "reset node stat of memory");
+            self.send_request_snapshot();
+            return;
+        }
         if self.pending_request_snapshot != INVALID_INDEX {
             self.send_request_snapshot();
             return;
